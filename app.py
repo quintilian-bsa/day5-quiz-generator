@@ -35,13 +35,30 @@ if "answers" not in st.session_state:
 # --- Screen 1: Upload + configure ---
 if st.session_state.questions is None:
     uploaded_file = st.file_uploader("Upload a .pptx file", type=["pptx"])
-    num_questions = st.slider("Number of questions", min_value=5, max_value=30, value=10)
+
+    # Two side-by-side controls so the form stays compact on a projector.
+    col_count, col_diff = st.columns(2)
+    with col_count:
+        num_questions = st.slider("Number of questions", min_value=5, max_value=30, value=10)
+    with col_diff:
+        difficulty = st.selectbox(
+            "Difficulty",
+            ["Simple", "Medium", "Complex"],
+            index=1,  # Medium is the default
+            help=(
+                "Simple = direct recall. "
+                "Medium = comprehension and relationships. "
+                "Complex = synthesis across multiple slides."
+            ),
+        )
 
     if uploaded_file and st.button("Generate Quiz", type="primary"):
         with st.spinner("Reading your slides..."):
             study_text = extract_text_from_pptx(uploaded_file)
-        with st.spinner(f"Writing {num_questions} questions..."):
-            st.session_state.questions = generate_mcqs(study_text, num_questions)
+        with st.spinner(f"Writing {num_questions} {difficulty.lower()}-difficulty questions..."):
+            st.session_state.questions = generate_mcqs(
+                study_text, num_questions, difficulty
+            )
         st.rerun()
 
 

@@ -21,7 +21,7 @@ client = OpenAI(
 )
 
 # Free tier model on OpenRouter. If this one is rate-limited, try:
-#   "anthropic/claude-haiku-4-5"
+#   "google/gemini-2.0-flash-exp:free"
 #   "deepseek/deepseek-chat-v3.1:free"
 MODEL = "anthropic/claude-haiku-4-5"
 
@@ -36,19 +36,29 @@ Each item in the array is an object with exactly these keys:
 - "explanation": a one-sentence explanation of why the correct answer is right
 
 Distractors (wrong options) must be plausible but clearly wrong on careful reading.
+
+Difficulty calibration (the user will tell you which level to write at):
+- "Simple": questions test direct recall of facts explicitly stated in the material. Distractors are obviously different from the correct answer; a student who skimmed the deck once should get them.
+- "Medium": questions test comprehension and the relationships between concepts. Distractors are plausible misreadings of the material.
+- "Complex": questions test synthesis across multiple slides or sections. Distractors require careful reading to rule out, and the correct answer may require connecting two pieces of the material.
 """
 
 
-def generate_mcqs(study_text: str, num_questions: int) -> list[dict]:
-    """Ask the AI to write `num_questions` MCQs based on `study_text`.
+def generate_mcqs(study_text: str, num_questions: int, difficulty: str = "Medium") -> list[dict]:
+    """Ask the AI to write `num_questions` MCQs based on `study_text` at the given difficulty.
+
+    Args:
+        study_text: The text extracted from the source material.
+        num_questions: How many MCQs to generate (5–30 enforced upstream by the UI).
+        difficulty: One of "Simple", "Medium", "Complex". Defaults to "Medium".
 
     Returns a list of dicts, each shaped like:
       {"question": "...", "options": ["A...","B...","C...","D..."],
        "correct_index": 2, "explanation": "..."}
     """
     user_prompt = (
-        f"Write {num_questions} multiple-choice questions based on this study material. "
-        f"Return ONLY the JSON array.\n\n"
+        f"Write {num_questions} multiple-choice questions at \"{difficulty}\" difficulty "
+        f"based on this study material. Return ONLY the JSON array.\n\n"
         f"STUDY MATERIAL:\n{study_text}"
     )
 
@@ -76,9 +86,9 @@ def generate_mcqs(study_text: str, num_questions: int) -> list[dict]:
 
 
 if __name__ == "__main__":
-    # Quick command-line test. Reads the assignment deck and prints 5 questions.
+    # Quick command-line test. Reads the assignment deck and prints 5 Complex-difficulty questions.
     from pptx_parser import extract_text_from_pptx
 
     text = extract_text_from_pptx("Day5_Application_Build.pptx")
-    questions = generate_mcqs(text, 5)
+    questions = generate_mcqs(text, 5, "Complex")
     print(json.dumps(questions, indent=2))
