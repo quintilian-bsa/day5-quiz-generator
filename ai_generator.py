@@ -7,6 +7,7 @@ Single responsibility: given study text + a question count, ask an LLM
 
 import json
 import os
+import re
 from openai import OpenAI
 from dotenv import load_dotenv
 
@@ -31,8 +32,12 @@ multiple-choice questions in strict JSON format.
 You MUST respond with ONLY a JSON array. No prose, no markdown, no code fences.
 Each item in the array is an object with exactly these keys:
 - "question": the question text (string)
-- "options": an array of EXACTLY 4 strings labeled A, B, C, D in order
+- "options": an array of EXACTLY 4 strings. Provide ONLY the raw answer text.
+  DO NOT prefix each option with "A)", "B)", "A.", "B.", or any letter label.
+  The user interface adds the A/B/C/D labels automatically. The order of the
+  array determines which option is A, B, C, and D.
 - "correct_index": an integer 0, 1, 2, or 3 indicating which option is correct
+  (0 = first option = "A", 1 = "B", 2 = "C", 3 = "D")
 - "explanation": a one-sentence explanation of why the correct answer is right
 
 Distractors (wrong options) must be plausible but clearly wrong on careful reading.
@@ -82,7 +87,29 @@ def generate_mcqs(study_text: str, num_questions: int, difficulty: str = "Medium
         raw = raw.strip()
 
     questions = json.loads(raw)
+
+    # Defensive cleanup: strip any "A)", "B)", "A.", "B.", "A:", etc. prefix the
+    # model may have added to option text, since the UI adds its own A/B/C/D labels.
+    # Without this, options render as "A. A) Creating quiz questions..." — doubled.
+    for q in questions:
+        if "options" in q:
+            q["options"] = [_strip_option_prefix(opt) for opt in q["options"]]
+
     return questions
+
+
+_OPTION_PREFIX_RE = re.compile(r"^\s*[A-Da-d]\s*[).:\-]\s*")
+
+
+def _strip_option_prefix(text: str) -> str:
+    """Remove any leading 'A)', 'B.', 'C:', etc. from option text.
+
+    Examples:
+      "A) The right answer"  -> "The right answer"
+      "B. Another option"    -> "Another option"
+      "Clean text already"   -> "Clean text already"
+    """
+    return _OPTION_PREFIX_RE.sub("", text).strip()
 
 
 if __name__ == "__main__":
